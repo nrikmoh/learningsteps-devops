@@ -38,7 +38,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: learningsteps-secrets
-                  key: DATABASE_URL
+                  key: database-url
             - name: APP_NAME
               valueFrom:
                 configMapKeyRef:
@@ -62,6 +62,10 @@ spec:
             capabilities:
               drop:
                 - ALL
+          volumeMounts:
+            - name: secrets-store
+              mountPath: /mnt/secrets-store
+              readOnly: true
           startupProbe:
             httpGet:
               path: /docs
@@ -81,3 +85,10 @@ spec:
               port: 8000
             initialDelaySeconds: 15
             periodSeconds: 20
+      volumes:
+        - name: secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: learningsteps-kv-secrets
