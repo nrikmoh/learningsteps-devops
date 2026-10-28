@@ -1,0 +1,7 @@
+skip-check:
+  - CKV_AZURE_226  # D2s_v6 does not support ephemeral OS disks
+  - CKV_AZURE_227  # Disk encryption set requires additional resources, not needed for dev
+  - CKV_AZURE_160  # Port 80 is intentionally open for public web traffic
+  - CKV_K8S_35     # Secrets as env vars acceptable for this project scope
+  - CKV_K8S_43     # Image digest applied at deploy time by k8s-deploy action
+  - CKV_K8S_14     # Image tag replaced with commit SHA at deploy time

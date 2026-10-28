@@ -128,6 +128,8 @@ resource "azurerm_kubernetes_cluster" "aks" {
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   dns_prefix          = "learningsteps"
+  automatic_upgrade_channel = "patch"
+  azure_policy_enabled      = true
   tags                = var.tags
 
   default_node_pool {
