@@ -20,6 +20,14 @@ spec:
       labels:
         app: learningsteps
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: learningsteps-api
           image: nrikmohacr.azurecr.io/learningsteps-api:latest
@@ -48,6 +56,12 @@ spec:
             limits:
               cpu: 500m
               memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
           startupProbe:
             httpGet:
               path: /docs
