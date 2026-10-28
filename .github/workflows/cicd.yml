@@ -4,6 +4,9 @@ on:
   push:
     branches: [reference]
 
+permissions:
+  contents: read
+
 jobs:
   build-and-scan:
     runs-on: ubuntu-latest
@@ -14,8 +17,8 @@ jobs:
       - name: Build Docker image
         run: docker build -t learningsteps-api:latest .
 
-      - name: Trivy - scan Docker image for vulnerabilities
-        uses: aquasecurity/trivy-action@master
+      - name: Trivy - scan Docker image
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: learningsteps-api:latest
           format: table
@@ -23,7 +26,22 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
 
-      - name: tfsec - scan Terraform for misconfigurations
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.6
+
+      - name: Terraform fmt check
+        working-directory: infra-terraform
+        run: terraform fmt -check -recursive
+
+      - name: Terraform validate
+        working-directory: infra-terraform
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+      - name: tfsec - scan Terraform
         uses: aquasecurity/tfsec-action@v1.0.3
         with:
           working_directory: infra-terraform
