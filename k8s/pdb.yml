@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: learningsteps-pdb
+  namespace: learningsteps
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: learningsteps
