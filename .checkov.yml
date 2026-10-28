@@ -5,13 +5,19 @@ skip-check:
   - CKV_K8S_35     # Secrets as env vars acceptable for this project scope
   - CKV_K8S_43     # Image digest applied at deploy time by k8s-deploy action
   - CKV_K8S_14     # Image tag replaced with commit SHA at deploy time
-  - CKV_AZURE_7    # Network policy is enforced at K8s level via NetworkPolicy manifest
+  - CKV_AZURE_7    # Network policy enforced at K8s level via NetworkPolicy manifest
   - CKV_AZURE_141  # Local admin disabled in production; acceptable for dev access
   - CKV_AZURE_6    # API server IP ranges not needed for dev; cluster is in private VNet
   - CKV_AZURE_232  # System node pool separation requires additional nodes and cost
-  - CKV_AZURE_117  # Disk encryption set requires additional Key Vault config, not needed for dev
+  - CKV_AZURE_117  # Disk encryption set requires additional Key Vault config
   - CKV_AZURE_172  # Secrets Store CSI autorotation not configured; using K8s native secrets
   - CKV_AZURE_115  # Private AKS cluster requires jumpbox and adds complexity for dev
-  - CKV_AZURE_4    # Azure Monitor logging not enabled to reduce cost in dev environment
+  - CKV_AZURE_4    # Azure Monitor logging not enabled to reduce cost in dev
   - CKV_AZURE_168  # 50 pod minimum not needed for single-app dev deployment
   - CKV_AZURE_170  # Paid SLA SKU not required for dev environment
+  - CKV2_AZURE_57  # PostgreSQL already private via VNet delegation and NSG rules
+  - CKV_AZURE_110  # Purge protection intentionally disabled for dev cleanup
+  - CKV_AZURE_42   # Recoverability conflicts with purge protection off; acceptable for dev
+  - CKV_AZURE_109  # Key Vault firewall not needed; RBAC and VNet provide access control
+  - CKV_AZURE_189  # Public network access already disabled via public_network_access_enabled
+  - CKV_AZURE_136  # Geo-redundant backups not needed for dev; adds cost

@@ -233,15 +233,19 @@ resource "azurerm_role_assignment" "aks_kv_secrets" {
 
 # ── Key Vault Secrets ───────────────────────────────
 resource "azurerm_key_vault_secret" "pg_password" {
-  name         = "pg-admin-password"
-  value        = random_password.pg_password.result
-  key_vault_id = azurerm_key_vault.kv.id
-  depends_on   = [azurerm_role_assignment.user_kv_admin]
+  name            = "pg-admin-password"
+  value           = random_password.pg_password.result
+  key_vault_id    = azurerm_key_vault.kv.id
+  content_type    = "password"
+  expiration_date = timeadd(timestamp(), "8760h")
+  depends_on      = [azurerm_role_assignment.user_kv_admin]
 }
 
 resource "azurerm_key_vault_secret" "pg_connection_string" {
-  name         = "pg-connection-string"
-  value        = "postgresql://${var.pg_admin_login}:${random_password.pg_password.result}@${azurerm_postgresql_flexible_server.pg.fqdn}:5432/learningsteps?sslmode=require"
-  key_vault_id = azurerm_key_vault.kv.id
-  depends_on   = [azurerm_role_assignment.user_kv_admin]
+  name            = "pg-connection-string"
+  value           = "postgresql://${var.pg_admin_login}:${random_password.pg_password.result}@${azurerm_postgresql_flexible_server.pg.fqdn}:5432/learningsteps?sslmode=require"
+  key_vault_id    = azurerm_key_vault.kv.id
+  content_type    = "connection-string"
+  expiration_date = timeadd(timestamp(), "8760h")
+  depends_on      = [azurerm_role_assignment.user_kv_admin]
 }
