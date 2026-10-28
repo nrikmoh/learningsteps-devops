@@ -20,5 +20,6 @@ output "key_vault_uri" {
 
 output "acr_login_server" {
   description = "Login server URL of the ACR"
-  value       = data.azurerm_container_registry.acr.login_server
+  value       = azurerm_container_registry.acr.login_server
 }
+

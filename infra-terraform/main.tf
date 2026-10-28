@@ -10,7 +10,11 @@ terraform {
 provider "azurerm" {
   subscription_id                 = "363cb92f-6ef5-4317-aedc-550b3478627f"
   resource_provider_registrations = "none"
-  features {}
+  features {
+    resource_group {
+      prevent_deletion_if_contains_resources = false
+    }
+  }
 }
 
 # ── Resource Group ──────────────────────────────────
@@ -151,15 +155,18 @@ resource "azurerm_kubernetes_cluster" "aks" {
 }
 
 # ── ACR Integration ─────────────────────────────────
-data "azurerm_container_registry" "acr" {
+resource "azurerm_container_registry" "acr" {
   name                = var.acr_name
   resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  sku                 = "Basic"
+  admin_enabled       = true
 }
 
 resource "azurerm_role_assignment" "aks_acr_pull" {
   principal_id                     = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
   role_definition_name             = "AcrPull"
-  scope                            = data.azurerm_container_registry.acr.id
+  scope                            = azurerm_container_registry.acr.id
   skip_service_principal_aad_check = true
 }
 
@@ -249,3 +256,5 @@ resource "azurerm_key_vault_secret" "pg_connection_string" {
   expiration_date = timeadd(timestamp(), "8760h")
   depends_on      = [azurerm_role_assignment.user_kv_admin]
 }
+
+
