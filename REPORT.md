@@ -4,14 +4,15 @@
 **Date:** October 2026
 **Repository:** https://github.com/nrikmoh/learningsteps-devops
 **Live Application:** http://20.4.140.251/docs
+**Live Monitoring:** http://20.4.154.214
 
 ---
 
 ## Executive Summary
 
-This report documents the design, implementation, and hardening of a fully automated DevSecOps pipeline for the LearningSteps API on Microsoft Azure. Over four weeks, the project evolved from a manual VM-based deployment to a production-grade Kubernetes infrastructure with 10-tool security scanning, zero-downtime deployments, and Infrastructure as Code reproducibility. Every git push to the repository now triggers an automated pipeline that builds, scans, and deploys the application without human intervention.
+This report documents the design, implementation, and hardening of a fully automated DevSecOps pipeline for the LearningSteps API on Microsoft Azure. Over four weeks, the project evolved from a manual VM-based deployment to a production-grade Kubernetes infrastructure with 12-tool security scanning, Key Vault CSI Driver secret synchronization, live Prometheus + Grafana monitoring dashboards, zero-downtime deployments, and Infrastructure as Code reproducibility. Every git push to the repository now triggers an automated pipeline that builds, scans, and deploys the application without human intervention.
 
-The project demonstrates proficiency in containerization (Docker, ACR), Infrastructure as Code (Terraform), CI/CD (GitHub Actions), security scanning (Trivy, tfsec, Checkov, Bandit, Semgrep, Hadolint, pip-audit, Kube-score), Kubernetes orchestration (AKS), and cloud networking (VNet, NSGs, Private DNS, NetworkPolicy).
+The project demonstrates proficiency in containerization (Docker, ACR), Infrastructure as Code (Terraform), CI/CD (GitHub Actions), security scanning (Trivy, tfsec, Checkov, Bandit, Semgrep, Hadolint, pip-audit, Kube-score, TruffleHog, flake8), Kubernetes orchestration (AKS), secret management (Azure Key Vault + CSI Driver), monitoring (Prometheus + Grafana), and cloud networking (VNet, NSGs, Private DNS, NetworkPolicy).
 
 ---
 
@@ -141,13 +142,13 @@ The initial git push included the .terraform/ directory containing 238 MB of pro
 
 - Created a GitHub Actions workflow (.github/workflows/cicd.yml) triggered on every push to the reference branch.
 - Configured the pipeline with two jobs: build-and-scan and deploy.
-- Integrated 10 security scanning tools across every layer of the stack.
+- Integrated 12 security scanning tools across every layer of the stack.
 - Added GitHub Secrets for ACR credentials and Azure Service Principal.
 - Configured Dependabot for automated dependency updates (Docker, pip, GitHub Actions).
 - Hardened the Dockerfile with non-root user, Debian 12 stable base, and HEALTHCHECK.
 - Added least-privilege permissions to the GitHub Actions token.
 
-### 5.2 The 10-Tool Security Stack
+### 5.2 The 12-Tool Security Stack
 
 | Tool | Layer Scanned | Gate Type |
 |------|--------------|-----------|
@@ -159,8 +160,12 @@ The initial git push included the .terraform/ directory containing 238 MB of pro
 | Hadolint | Dockerfile best practices | Error threshold |
 | pip-audit | Python package dependencies | Report only |
 | Kube-score | K8s manifest readiness | Report only |
+| TruffleHog | Git history and code for leaked secrets | Hard gate (verified secrets only) |
+| flake8 | Python code style and quality | Report only |
 | terraform fmt | Terraform formatting | Hard gate |
 | terraform validate | Terraform syntax | Hard gate |
+
+Additionally, pytest runs automated tests when a tests/ directory exists.
 
 ### 5.3 Challenges and Solutions
 
@@ -195,7 +200,7 @@ The Dockerfile evolved significantly during Week 3:
 ### 5.5 Deliverables
 
 - Fully automated CI/CD pipeline (green on every push).
-- 10-tool security scanning integrated into the pipeline.
+- 12-tool security scanning integrated into the pipeline.
 - Hardened Dockerfile with non-root user and HEALTHCHECK.
 - Dependabot configuration for automated dependency updates.
 - Least-privilege GitHub Actions token (contents: read).
@@ -203,14 +208,17 @@ The Dockerfile evolved significantly during Week 3:
 
 ---
 
-## 6. Week 4: Kubernetes Orchestration and Deployment
+## 6. Week 4: Kubernetes Orchestration, Secret Sync, and Monitoring
 
 ### 6.1 What Was Done
 
-- Created 7 Kubernetes manifests: Namespace, Deployment, Service, ConfigMap, HPA, PDB, NetworkPolicy.
+- Created 10 Kubernetes manifests: Namespace, Deployment, Service, ConfigMap, HPA, PDB, NetworkPolicy, SecretProviderClass, ServiceMonitor, and Prometheus Helm values.
 - Hardened the Deployment with full security context (non-root, read-only filesystem, dropped capabilities, seccomp profile, no privilege escalation, no service account token).
 - Stored the PostgreSQL connection string in Azure Key Vault via Terraform.
-- Injected the database password into the AKS cluster as a Kubernetes Secret.
+- Integrated the Azure Key Vault CSI Driver to automatically sync secrets from Key Vault to AKS pods every 2 minutes, eliminating manual kubectl create secret commands.
+- Deployed Prometheus + Grafana monitoring stack via Helm (kube-prometheus-stack) with a ServiceMonitor that scrapes the application /metrics endpoint every 15 seconds.
+- Added prometheus-fastapi-instrumentator to the FastAPI application to expose HTTP request metrics.
+- Added TruffleHog secret scanning, flake8 linting, and pytest to the CI/CD pipeline.
 - Deployed the application to AKS with a public LoadBalancer IP.
 - Added an automated deploy job to the GitHub Actions pipeline using an Azure Service Principal.
 - Achieved zero Checkov errors through a combination of fixes and documented risk acceptance.
@@ -219,12 +227,21 @@ The Dockerfile evolved significantly during Week 3:
 
 The deployment uses a dedicated learningsteps namespace with the following resources:
 
-- **Deployment:** 1 replica (auto-scales to 5 via HPA), rolling update strategy (maxSurge: 1, maxUnavailable: 0), three health probes (startup, readiness, liveness).
+- **Deployment:** 1 replica (auto-scales to 5 via HPA), rolling update strategy (maxSurge: 1, maxUnavailable: 0), three health probes (startup, readiness, liveness), CSI volume mount for Key Vault secrets.
 - **Service:** LoadBalancer type, maps port 80 (public) to port 8000 (container).
 - **ConfigMap:** Non-secret configuration (APP_NAME, LOG_LEVEL, ENVIRONMENT).
 - **HPA:** Scales from 1 to 5 pods when CPU exceeds 70%.
 - **PDB:** Ensures at least 1 pod remains available during maintenance.
 - **NetworkPolicy:** Ingress allows port 8000 from anywhere. Egress allows port 5432 to the DB subnet (10.0.2.0/24) and port 53 (DNS) only. All other traffic is blocked.
+- **SecretProviderClass:** Configures the Azure Key Vault CSI Driver to fetch pg-connection-string from Key Vault and auto-create a Kubernetes Secret.
+- **ServiceMonitor:** Tells Prometheus to scrape the application /metrics endpoint every 15 seconds.
+
+A dedicated monitoring namespace runs the Prometheus + Grafana stack:
+
+- **Prometheus:** Collects metrics from all pods, nodes, and the application.
+- **Grafana:** Visualizes metrics on pre-built Kubernetes dashboards (CPU, memory, pod health).
+- **kube-state-metrics:** Exposes Kubernetes object state as Prometheus metrics.
+- **node-exporter:** Exposes host-level hardware and OS metrics.
 
 ### 6.3 Challenges and Solutions
 
@@ -246,18 +263,27 @@ Two new lines added to main.tf had incorrect indentation, causing the terraform 
 
 **Challenge 5: Service Principal for automated deployment**
 The GitHub Actions robot needed permission to deploy to AKS, requiring an Azure identity.
-*Solution:* Created a Service Principal with `az ad sp create-for-rbac` scoped to the resource group with Contributor role. The credentials were stored as the AZURE_CREDENTIALS GitHub Secret.
+*Solution:* Created a Service Principal with az ad sp create-for-rbac scoped to the resource group with Contributor role. The credentials were stored as the AZURE_CREDENTIALS GitHub Secret.
+
+**Challenge 6: CSI Driver chicken-and-egg problem**
+The pod could not start because it needed the DATABASE_URL env var from a Kubernetes Secret, but the CSI Driver creates that Secret only after the pod mounts the volume. The pod was stuck in CreateContainerConfigError.
+*Solution:* Seeded the Kubernetes Secret once manually from Key Vault using az keyvault secret show piped to kubectl apply. After the initial seed, the CSI Driver keeps the Secret automatically synced every 2 minutes.
+
+**Challenge 7: flake8 style warnings in upstream code**
+The original LearningSteps codebase had 47 flake8 style warnings (trailing whitespace, missing blank lines, unused imports). None were bugs or security issues.
+*Solution:* Configured flake8 with continue-on-error: true so it reports warnings without blocking the pipeline. The warnings are visible in the CI logs for future cleanup.
 
 ### 6.4 The Full Automated Pipeline
 
 The final pipeline executes on every git push:
-
 ```
 git push
   |
   v
 Job 1: build-and-scan (7-10 minutes)
-  |-- Checkout code
+  |-- Checkout code (full history for TruffleHog)
+  |-- TruffleHog (secret scanning, HARD GATE)
+  |-- flake8 (Python lint) + pytest (tests)
   |-- Build Docker image
   |-- Hadolint (Dockerfile)
   |-- Trivy (image CVEs, HARD GATE)
@@ -280,16 +306,20 @@ Job 2: deploy (2-3 minutes)
   |
   v
 Live at http://20.4.140.251/docs
+Monitored at http://20.4.154.214
 ```
 
 ### 6.5 Deliverables
 
 - Live application accessible at http://20.4.140.251/docs.
-- 7 Kubernetes manifests with full security hardening.
+- Live Grafana dashboards at http://20.4.154.214.
+- 10 Kubernetes manifests with full security hardening.
+- Key Vault CSI Driver auto-syncing secrets to pods every 2 minutes.
+- Prometheus scraping application /metrics endpoint every 15 seconds.
 - Automated deploy job in the CI/CD pipeline.
 - Zero Checkov errors (all findings resolved or documented).
-- Database secrets stored in Key Vault with expiration dates.
-- Complete end-to-end automation from git push to live deployment.
+- Database secrets stored in Key Vault with expiration dates, no manual injection needed.
+- Complete end-to-end automation from git push to live deployment with monitoring.
 
 ---
 
@@ -300,15 +330,18 @@ Live at http://20.4.140.251/docs
 | Category | Count |
 |----------|-------|
 | Azure resources (Terraform-managed) | 15+ |
-| Kubernetes manifests | 7 |
-| Security scanning tools | 10 |
+| Kubernetes manifests | 10 |
+| Security scanning tools | 12 |
 | GitHub Secrets | 3 (ACR_USERNAME, ACR_PASSWORD, AZURE_CREDENTIALS) |
 | Key Vault secrets | 2 (pg-admin-password, pg-connection-string) |
 | CI/CD pipeline jobs | 2 (build-and-scan, deploy) |
-| Pipeline steps | 16 |
+| Pipeline steps | 19 |
 | Checkov errors | 0 (from 30+ initial findings) |
 | Trivy HIGH/CRITICAL CVEs | 0 fixable |
 | Deployment downtime | 0 seconds (rolling updates) |
+| Monitoring stack pods | 5 (Prometheus, Grafana, operator, kube-state, node-exporter) |
+| Metrics scrape interval | 15 seconds |
+| Secret sync interval | 2 minutes |
 
 ### 7.2 Reproducibility Test
 
@@ -318,7 +351,7 @@ The entire infrastructure can be destroyed and recreated with two commands:
     terraform destroy
     terraform apply
 
-This recreates all 15+ Azure resources identically. The application is then deployed automatically by the CI/CD pipeline on the next git push.
+This recreates all 15+ Azure resources identically. The application is then deployed automatically by the CI/CD pipeline on the next git push. The monitoring stack is reinstalled with a single Helm command.
 
 ### 7.3 Security Posture
 
@@ -326,12 +359,13 @@ This recreates all 15+ Azure resources identically. The application is then depl
 |-------|---------------|---------------|
 | Container | Ran as root, Debian testing, no health check | Non-root (UID 10001), Debian stable, HEALTHCHECK, read-only FS, all capabilities dropped |
 | Network | Public VM, all ports open | Private VNet, NSGs, K8s NetworkPolicy, private PostgreSQL |
-| Secrets | Hardcoded or in .env files | Azure Key Vault with expiration, K8s Secrets, GitHub encrypted Secrets |
-| Code | No scanning | Bandit + Semgrep on every push |
+| Secrets | Hardcoded or in .env files | Azure Key Vault with expiration, CSI Driver auto-sync to pods, GitHub encrypted Secrets |
+| Code | No scanning | Bandit + Semgrep + flake8 + TruffleHog on every push |
 | Dependencies | No monitoring | Trivy + pip-audit + Dependabot |
 | Infrastructure | Manual, no audit trail | Terraform (version-controlled), tfsec + Checkov scanning |
 | Access Control | Admin everywhere | Least-privilege RBAC (AcrPull, KV Secrets User, contents:read) |
 | Deployment | Manual SSH + docker run | Fully automated via GitHub Actions |
+| Monitoring | None | Prometheus + Grafana with live dashboards and /metrics endpoint |
 
 ---
 
@@ -344,6 +378,7 @@ This recreates all 15+ Azure resources identically. The application is then depl
 | Azure Container Registry | Basic | $5 |
 | Key Vault | Standard | $1-3 |
 | Load Balancer + Public IP | Basic | $3 |
+| Prometheus + Grafana | On existing AKS node | $0 |
 | VNet, DNS, NSGs | - | Free |
 | GitHub Actions | Free tier (2000 min/month) | $0 |
 | **Total** | | **$82-104** |
@@ -353,6 +388,8 @@ This recreates all 15+ Azure resources identically. The application is then depl
 - Burstable B1ms tier for PostgreSQL (cheapest available).
 - Basic ACR tier (sufficient for single-image projects).
 - Single AKS node (HPA scales up only under load).
+- Monitoring stack runs on existing node (no additional VMs).
+- Prometheus retention set to 1 day to minimize disk usage.
 - terraform destroy available for complete cost elimination when not in use.
 
 ---
@@ -369,9 +406,9 @@ This recreates all 15+ Azure resources identically. The application is then depl
 
 4. **Least privilege everywhere.** AKS gets AcrPull (read-only image access), not Owner. The pipeline token gets contents: read, not write. The Service Principal is scoped to a single resource group. Every identity has the minimum permissions needed.
 
-5. **Secrets belong in a vault with expiration dates.** Database credentials are generated by Terraform, stored in Azure Key Vault with a one-year expiration, and injected into Kubernetes as Secrets. They never appear in code, config files, or git history.
+5. **Secrets belong in a vault with expiration dates.** Database credentials are generated by Terraform, stored in Azure Key Vault with a one-year expiration, and auto-synced to pods via the CSI Driver. They never appear in code, config files, or git history.
 
-6. **Containers must be hardened.** Running as root, with full Linux capabilities, on a writable filesystem, without health checks is the default — and it is dangerous. The hardened Dockerfile and security context eliminate entire categories of container escape attacks.
+6. **Containers must be hardened.** Running as root, with full Linux capabilities, on a writable filesystem, without health checks is the default -- and it is dangerous. The hardened Dockerfile and security context eliminate entire categories of container escape attacks.
 
 7. **ignore-unfixed is a real-world necessity.** Blocking the pipeline on OS-level CVEs that the vendor has not patched means the pipeline is permanently broken. The professional approach is to ignore unfixable vulnerabilities while blocking on fixable ones.
 
@@ -379,19 +416,23 @@ This recreates all 15+ Azure resources identically. The application is then depl
 
 9. **Every skipped security check must be documented.** The .checkov.yml file contains 22 skipped checks, each with a rationale. Risk acceptance is not the same as ignorance. A reviewer can see that each finding was evaluated and a conscious decision was made.
 
-10. **Defense in depth is essential.** No single security layer is sufficient. The project uses NSGs + NetworkPolicy + RBAC + private networking + secret management + container hardening + code scanning + image scanning + IaC scanning. An attacker would need to bypass all of these layers.
+10. **Defense in depth is essential.** No single security layer is sufficient. The project uses NSGs + NetworkPolicy + RBAC + private networking + secret management + container hardening + code scanning + image scanning + IaC scanning + secret scanning. An attacker would need to bypass all of these layers.
+
+11. **CSI Driver eliminates manual secret injection.** The chicken-and-egg problem (pod needs secret to start, CSI needs pod to create secret) is a real-world challenge. Seeding the secret once and letting the CSI Driver maintain it is the practical solution. Key Vault becomes the single source of truth.
+
+12. **Monitoring is not optional.** If you cannot see your metrics, you cannot fix your problems. Adding prometheus-fastapi-instrumentator to the FastAPI app and deploying the kube-prometheus-stack turned invisible infrastructure into visible dashboards in under an hour.
 
 ### Process Lessons
 
-11. **Start with the simplest possible deployment, then harden.** Week 1 was just "make it run." Security hardening came in Weeks 3-4. Trying to do everything at once leads to paralysis.
+13. **Start with the simplest possible deployment, then harden.** Week 1 was just "make it run." Security hardening came in Weeks 3-4. Trying to do everything at once leads to paralysis.
 
-12. **Read error messages carefully.** Every Azure error message contains the exact reason for failure and often a link to documentation. The MissingSubscriptionRegistration, K8sVersionNotSupported, and ServiceCidrOverlap errors were all solved by reading the error text.
+14. **Read error messages carefully.** Every Azure error message contains the exact reason for failure and often a link to documentation. The MissingSubscriptionRegistration, K8sVersionNotSupported, and ServiceCidrOverlap errors were all solved by reading the error text.
 
-13. **Automate the boring stuff.** The try-sizes.ps1 script that tested 8 VM sizes automatically saved hours of manual terraform apply cycles. The CI/CD pipeline saves hours of manual deployment on every push.
+15. **Automate the boring stuff.** The try-sizes.ps1 script that tested 8 VM sizes automatically saved hours of manual terraform apply cycles. The CI/CD pipeline saves hours of manual deployment on every push.
 
-14. **Git history matters.** Accidentally pushing 238 MB of binaries to GitHub required a git reset to fix. Proper .gitignore files from the start would have prevented this.
+16. **Git history matters.** Accidentally pushing 238 MB of binaries to GitHub required a git reset to fix. Proper .gitignore files from the start would have prevented this.
 
-15. **Document everything.** The README, the REPORT, the .checkov.yml rationales, the commit messages — documentation is what separates a project that works from a project that others can understand and maintain.
+17. **Document everything.** The README, the REPORT, the .checkov.yml rationales, the commit messages -- documentation is what separates a project that works from a project that others can understand and maintain.
 
 ---
 
@@ -400,10 +441,10 @@ This recreates all 15+ Azure resources identically. The application is then depl
 | Priority | Improvement | Effort | Impact |
 |----------|------------|--------|--------|
 | High | Custom domain + HTTPS (TLS) | 1 week | Eliminates "Not Secure" browser warning |
-| High | Prometheus + Grafana monitoring | 2 weeks | Real-time dashboards for CPU, memory, request latency |
 | Medium | ArgoCD (GitOps) | 1 week | Pull-based deployments, audit trail |
 | Medium | Multi-environment (dev/staging/prod) | 2-3 weeks | Separate environments with branch-based deploys |
 | Medium | Image signing with Cosign | 1 week | Cryptographic verification of image provenance |
+| Medium | Custom Grafana dashboards | 1 day | Application-specific metrics (request rate, latency, error rate) |
 | Low | Microsoft Defender for Cloud | 30 min | Cloud-level threat detection |
 | Low | Helm chart packaging | 1 week | Reusable, parameterized K8s deployments |
 
@@ -414,16 +455,19 @@ This recreates all 15+ Azure resources identically. The application is then depl
 This project demonstrates that a production-grade DevSecOps pipeline is achievable in four weeks, even starting from zero cloud experience. The final system features:
 
 - **Full automation:** From git push to live deployment in under 15 minutes, with zero manual steps.
-- **Comprehensive security:** 10 scanning tools covering code, dependencies, containers, infrastructure, and orchestration.
+- **Comprehensive security:** 12 scanning tools covering code, dependencies, containers, infrastructure, orchestration, and git history for leaked secrets.
+- **Automated secret management:** Azure Key Vault CSI Driver syncs secrets to pods every 2 minutes with no manual intervention.
+- **Live monitoring:** Prometheus collects metrics every 15 seconds; Grafana provides real-time dashboards for cluster health.
 - **Zero-downtime deployments:** Rolling updates ensure users never experience interruption.
 - **Complete reproducibility:** terraform destroy + terraform apply recreates the entire environment identically.
-- **Defense in depth:** Seven layers of security from network to application to secrets.
+- **Defense in depth:** Eight layers of security from network to application to secrets to git history.
 - **Cost awareness:** Under $100/month with auto-stop and budget-conscious resource selection.
 
-The journey from a failed manual VM deployment to a hardened, automated Kubernetes pipeline reinforced the core DevOps principle: **automate everything, secure everything, document everything.**
+The journey from a failed manual VM deployment to a hardened, automated, monitored Kubernetes pipeline reinforced the core DevOps principle: **automate everything, secure everything, monitor everything, document everything.**
 
 ---
 
 *Report prepared by Moh (nrikmoh) as part of a hands-on DevSecOps learning project.*
 *Repository: https://github.com/nrikmoh/learningsteps-devops*
 *Live Application: http://20.4.140.251/docs*
+*Live Monitoring: http://20.4.154.214*
