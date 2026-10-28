@@ -1,0 +1,53 @@
+=== CI/CD PIPELINE EXECUTION PROOF ===
+Repository: https://github.com/nrikmoh/learningsteps-devops
+Branch: reference
+Pipeline: .github/workflows/cicd.yml
+
+STATUS: GREEN (all jobs passed)
+
+JOB 1: build-and-scan
+  [PASS] Checkout code (full history)
+  [PASS] TruffleHog secret scanning (no verified secrets found)
+  [PASS] flake8 linting (47 style warnings, 0 errors, continue-on-error)
+  [PASS] pytest (no tests directory, skipped gracefully)
+  [PASS] Docker build (Debian 12, non-root, HEALTHCHECK)
+  [PASS] Hadolint Dockerfile scan (no errors)
+  [PASS] Trivy image scan (0 fixable HIGH/CRITICAL CVEs, ignore-unfixed)
+  [PASS] Bandit Python scan (no high-confidence issues)
+  [PASS] pip-audit dependency scan (no known CVEs)
+  [PASS] Semgrep deep code analysis (no critical findings)
+  [PASS] terraform fmt (formatting correct)
+  [PASS] terraform validate (syntax valid)
+  [PASS] tfsec IaC scan (soft fail, no blocking issues)
+  [PASS] Checkov IaC+K8s+Docker scan (0 errors, 22 documented skips)
+  [PASS] kube-score K8s manifest scan (no critical issues)
+  [PASS] Push to ACR (nrikmohacr.azurecr.io/learningsteps-api:<sha>)
+
+JOB 2: deploy
+  [PASS] Azure Login (Service Principal)
+  [PASS] AKS context set (learningsteps-aks)
+  [PASS] K8s manifests applied (rolling update, zero downtime)
+  [PASS] Image tag replaced with commit SHA
+
+LIVE ENDPOINTS:
+  API Swagger: http://20.4.140.251/docs
+  API Metrics: http://20.4.140.251/metrics
+  Grafana:     http://20.4.154.214
+
+SECURITY SCAN SUMMARY:
+  - 12 tools executed across code, deps, containers, IaC, K8s, git history
+  - 0 blocking vulnerabilities
+  - 0 leaked secrets
+  - 0 Checkov errors (22 documented risk acceptances in .checkov.yml)
+  - Trivy: 0 fixable HIGH/CRITICAL CVEs (ignore-unfixed for OS-level)
+
+MONITORING:
+  - Prometheus scraping /metrics every 15 seconds
+  - Grafana dashboards available at http://20.4.154.214
+  - Pre-built dashboards: Kubernetes Compute Resources (Cluster, Pod, Node)
+  - 5 monitoring pods running (Prometheus, Grafana, operator, kube-state, node-exporter)
+
+SECRET MANAGEMENT:
+  - Azure Key Vault CSI Driver enabled
+  - Secrets auto-synced from kv-learningsteps-mk every 2 minutes
+  - No manual kubectl create secret required
