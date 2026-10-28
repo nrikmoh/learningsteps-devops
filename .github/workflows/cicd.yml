@@ -13,8 +13,38 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      # ── Docker Scanning ──
+      # -- Secret Scanning (Gap 1) --
+      - name: TruffleHog - secret scanning
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified
+
+      # -- Python Lint and Tests (Gap 2) --
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install lint and test tools
+        run: pip install flake8 pytest
+
+      - name: Flake8 - lint Python code
+        run: flake8 api/ --max-line-length=120 --ignore=E501,W503,E402
+        continue-on-error: true
+
+      - name: Pytest - run tests
+        run: |
+          if [ -d "tests" ]; then
+            pytest tests/ -v
+          else
+            echo "No tests directory found. Skipping."
+          fi
+        continue-on-error: true
+
+      # -- Docker Scanning --
       - name: Build Docker image
         run: docker build -t learningsteps-api:latest .
 
@@ -33,12 +63,7 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
 
-      # ── Python Code Scanning ──
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
+      # -- Python Code Scanning --
       - name: Bandit - scan Python code
         run: |
           pip install bandit
@@ -57,7 +82,7 @@ jobs:
           config: p/python
         continue-on-error: true
 
-      # ── Infrastructure Scanning ──
+      # -- Infrastructure Scanning --
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -93,7 +118,7 @@ jobs:
           ./kube-score score k8s/*.yml || true
         continue-on-error: true
 
-      # ── Push to ACR ──
+      # -- Push to ACR --
       - name: Login to ACR
         uses: docker/login-action@v3
         with:
