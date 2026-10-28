@@ -18,7 +18,7 @@ jobs:
         run: docker build -t learningsteps-api:latest .
 
       - name: Trivy - scan Docker image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@master  # TODO: pin to release SHA for production
         with:
           image-ref: learningsteps-api:latest
           format: table
