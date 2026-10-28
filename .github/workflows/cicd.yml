@@ -18,7 +18,7 @@ jobs:
         run: docker build -t learningsteps-api:latest .
 
       - name: Trivy - scan Docker image
-        uses: aquasecurity/trivy-action@master  # TODO: pin to release SHA for production
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: learningsteps-api:latest
           format: table
@@ -60,3 +60,36 @@ jobs:
           docker tag learningsteps-api:latest nrikmohacr.azurecr.io/learningsteps-api:latest
           docker push nrikmohacr.azurecr.io/learningsteps-api:${{ github.sha }}
           docker push nrikmohacr.azurecr.io/learningsteps-api:latest
+
+  deploy:
+    needs: build-and-scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set AKS context
+        uses: azure/aks-set-context@v4
+        with:
+          resource-group: rg-learningsteps-devops
+          cluster-name: learningsteps-aks
+
+      - name: Deploy to AKS
+        uses: azure/k8s-deploy@v5
+        with:
+          namespace: learningsteps
+          manifests: |
+            k8s/namespace.yml
+            k8s/configmap.yml
+            k8s/deployment.yml
+            k8s/service.yml
+            k8s/hpa.yml
+            k8s/pdb.yml
+            k8s/networkpolicy.yml
+          images: |
+            nrikmohacr.azurecr.io/learningsteps-api:${{ github.sha }}
