@@ -246,40 +246,41 @@ Two new lines added to main.tf had incorrect indentation, causing the terraform 
 
 **Challenge 5: Service Principal for automated deployment**
 The GitHub Actions robot needed permission to deploy to AKS, requiring an Azure identity.
-*Solution:* Created a Service Principal with az ad sp create-for-rbac scoped to the resource group with Contributor role. The credentials were stored as the AZURE_CREDENTIALS GitHub Secret.
+*Solution:* Created a Service Principal with `az ad sp create-for-rbac` scoped to the resource group with Contributor role. The credentials were stored as the AZURE_CREDENTIALS GitHub Secret.
 
 ### 6.4 The Full Automated Pipeline
 
 The final pipeline executes on every git push:
 
+```
 git push
-|
-v
+  |
+  v
 Job 1: build-and-scan (7-10 minutes)
-|-- Checkout code
-|-- Build Docker image
-|-- Hadolint (Dockerfile)
-|-- Trivy (image CVEs, HARD GATE)
-|-- Bandit (Python code)
-|-- pip-audit (Python deps)
-|-- Semgrep (deep analysis)
-|-- terraform fmt (HARD GATE)
-|-- terraform validate (HARD GATE)
-|-- tfsec (IaC)
-|-- Checkov (IaC + K8s + Docker)
-|-- Kube-score (K8s)
-|-- Push to ACR (commit SHA tag)
-|
-v (only if all green)
+  |-- Checkout code
+  |-- Build Docker image
+  |-- Hadolint (Dockerfile)
+  |-- Trivy (image CVEs, HARD GATE)
+  |-- Bandit (Python code)
+  |-- pip-audit (Python deps)
+  |-- Semgrep (deep analysis)
+  |-- terraform fmt (HARD GATE)
+  |-- terraform validate (HARD GATE)
+  |-- tfsec (IaC)
+  |-- Checkov (IaC + K8s + Docker)
+  |-- Kube-score (K8s)
+  |-- Push to ACR (commit SHA tag)
+  |
+  v (only if all green)
 Job 2: deploy (2-3 minutes)
-|-- Azure Login (Service Principal)
-|-- Connect to AKS
-|-- Apply K8s manifests (rolling update)
-|-- Replace image tag with commit SHA
-|
-v
+  |-- Azure Login (Service Principal)
+  |-- Connect to AKS
+  |-- Apply K8s manifests (rolling update)
+  |-- Replace image tag with commit SHA
+  |
+  v
 Live at http://20.4.140.251/docs
-
+```
 
 ### 6.5 Deliverables
 
