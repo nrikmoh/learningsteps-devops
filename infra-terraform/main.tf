@@ -124,13 +124,13 @@ resource "azurerm_subnet_network_security_group_association" "db_nsg_link" {
 
 # ── AKS Cluster ─────────────────────────────────────
 resource "azurerm_kubernetes_cluster" "aks" {
-  name                = "learningsteps-aks"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-  dns_prefix          = "learningsteps"
+  name                      = "learningsteps-aks"
+  location                  = azurerm_resource_group.rg.location
+  resource_group_name       = azurerm_resource_group.rg.name
+  dns_prefix                = "learningsteps"
   automatic_upgrade_channel = "patch"
   azure_policy_enabled      = true
-  tags                = var.tags
+  tags                      = var.tags
 
   default_node_pool {
     name           = "default"
