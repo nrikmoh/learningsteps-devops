@@ -46,6 +46,7 @@ jobs:
         with:
           working_directory: infra-terraform
           soft_fail: true
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Login to ACR
         uses: docker/login-action@v3
