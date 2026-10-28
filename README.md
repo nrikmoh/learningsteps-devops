@@ -2,6 +2,8 @@
 
 A fully automated DevOps pipeline for the LearningSteps API, deployed on Microsoft Azure using Infrastructure as Code, CI/CD, container security scanning, and Kubernetes orchestration.
 
+![CI/CD Pipeline](https://github.com/nrikmoh/learningsteps-devops/actions/workflows/cicd.yml/badge.svg)
+
 **Goal:** Every git push to the reference branch automatically builds, scans, and deploys the application to a live AKS cluster with zero manual intervention.
 
 ---
@@ -93,7 +95,7 @@ To destroy all resources and stop billing:
 |------|-----------|--------|
 | 1 | Containerization: Dockerfile, ACR push, GitHub repo | Done |
 | 2 | IaC: AKS, PostgreSQL, Key Vault, NSGs, Private DNS | Done |
-| 3 | CI/CD + DevSecOps: GitHub Actions, Trivy, tfsec | Planned |
+| 3 | CI/CD + DevSecOps: GitHub Actions, Trivy, tfsec | Done |
 | 4 | Orchestration: K8s manifests, deploy, monitoring | Planned |
 
 ---
