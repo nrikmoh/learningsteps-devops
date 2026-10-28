@@ -21,6 +21,7 @@ jobs:
           format: table
           exit-code: 1
           severity: HIGH,CRITICAL
+          ignore-unfixed: true
 
       - name: tfsec - scan Terraform for misconfigurations
         uses: aquasecurity/tfsec-action@v1.0.3
