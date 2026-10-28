@@ -1,173 +1,110 @@
-# LearningSteps API
+# LearningSteps - DevOps Pipeline on Azure
 
-Welcome to LearningSteps! LearningSteps is a Python FastAPI + PostgreSQL application that helps people track their daily learning journey. This is a reference implementation, deploy this to the cloud!
+A fully automated DevOps pipeline for the LearningSteps API, deployed on Microsoft Azure using Infrastructure as Code, CI/CD, container security scanning, and Kubernetes orchestration.
 
+**Goal:** Every git push to the reference branch automatically builds, scans, and deploys the application to a live AKS cluster with zero manual intervention.
 
-## Table of Contents
+---
 
-- [🚀 Getting Started](#-getting-started)
-- [⚙️ API Endpoints](#-api-endpoints)
-- [☁️ Azure CLI for Deployment](#️-azure-cli-for-deployment)
-- [📊 Data Schema](#-data-schema)
-- [�️ Explore Your Database (Optional)](#️-explore-your-database-optional)
-- [🔧 Troubleshooting](#-troubleshooting)
+## Architecture
 
-## 🚀 Getting Started
+Internet -> AKS NSG (Allow 80, 443) -> Azure VNet (10.0.0.0/16) -> AKS Subnet (10.0.1.0/24) with AKS Pods -> DB Subnet (10.0.2.0/24) with PostgreSQL Flexible Server. ACR and Key Vault sit outside the VNet.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Application | Python 3.12, FastAPI, Uvicorn |
+| Containerization | Docker, Azure Container Registry (ACR) |
+| Infrastructure | Terraform (HCL), Azure (AKS, VNet, PostgreSQL, Key Vault) |
+| CI/CD | GitHub Actions |
+| Security | Trivy (container scanning), tfsec (IaC scanning) |
+| Orchestration | Azure Kubernetes Service (AKS) |
+| Monitoring | Prometheus + Grafana (planned) |
+
+---
+
+## Project Structure
+
+- api/ — FastAPI application source code
+- Dockerfile — Container build
+- infra-terraform/ — Infrastructure as Code (main.tf, variables.tf, outputs.tf)
+- .github/workflows/ — CI/CD pipeline (Week 3)
+- README.md — This file
+
+---
+
+## Quick Start
 
 ### Prerequisites
 
-- Git installed on your machine
-- Docker Desktop installed and running
-- VS Code with the Dev Containers extension
+- Azure CLI (az)
+- Terraform v1.5+
+- Docker Desktop
+- kubectl
+- An Azure subscription
 
-### 1. Clone the Repository
+### 1. Authenticate with Azure
 
-1. **Clone this repository** to your local machine:
+    az login
 
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/learningsteps.git
-   ```
+### 2. Deploy Infrastructure
 
-1. Move into the project directory:
+    cd infra-terraform
+    terraform init
+    terraform apply
 
-   ```bash
-   cd learningsteps
-   ```
+### 3. Connect to AKS
 
-1. **Open in VS Code**:
+    az aks get-credentials --name learningsteps-aks --resource-group rg-learningsteps-devops
+    kubectl get nodes
 
-   ```bash
-   code .
-   ```
+---
 
-### 2. Configure Your Environment (.env)
+## Cost Estimate
 
-Environment variables live in a `.env` file (which is **git-ignored** so you don't accidentally commit secrets). This repo ships with a template named `.env-sample`.
+| Resource | Tier | Monthly Cost |
+|----------|------|-------------|
+| AKS (1x D2s_v6 node) | Standard | ~$60-75 |
+| PostgreSQL Flexible Server | B1ms Burstable | ~$13-18 |
+| Azure Container Registry | Basic | ~$5 |
+| Key Vault | Standard | ~$1-3 |
+| VNet + DNS + NSGs | - | Free |
+| **Total** | | **~$80-100** |
 
-1. Copy the sample file to create your real `.env`:
+Resources are subject to an auto-stop policy (midnight UTC daily). Run `az aks start --name learningsteps-aks --resource-group rg-learningsteps-devops` each morning.
 
-   ```bash
-   cp .env-sample .env
-   ```
+---
 
-### 3. Set Up Your Development Environment
+## Cleanup
 
-1. **Install the Dev Containers extension** in VS Code (if not already installed)
-2. **Reopen in container**: When VS Code detects the `.devcontainer` folder, click "Reopen in Container"
-   - Or use Command Palette (`Cmd/Ctrl + Shift + P`): `Dev Containers: Reopen in Container`
-3. **Wait for setup**: The API container will automatically install Python, dependencies, and configure your environment.
-   The PostgreSQL Database container will also automatically be created.
+To destroy all resources and stop billing:
 
-### 4. Verify the PostgreSQL Database Is Running
+    cd infra-terraform
+    terraform destroy
 
-In a terminal outside of VS Code, run:
+---
 
-   ```bash
-      docker ps
-   ```
+## Progress Log
 
-You should see the postgres service running.
+| Week | Milestone | Status |
+|------|-----------|--------|
+| 1 | Containerization: Dockerfile, ACR push, GitHub repo | Done |
+| 2 | IaC: AKS, PostgreSQL, Key Vault, NSGs, Private DNS | Done |
+| 3 | CI/CD + DevSecOps: GitHub Actions, Trivy, tfsec | Planned |
+| 4 | Orchestration: K8s manifests, deploy, monitoring | Planned |
 
-### 5. Run the API
+---
 
-Make sure you are in the root of your project in the terminal (inside VS Code, while container is running):
+## Security Features
 
-   ```bash
-     ./start.sh
-   ```
+- **Private networking:** PostgreSQL has no public endpoint; accessible only from the AKS subnet via NSG rules
+- **Least-privilege RBAC:** AKS can pull images (AcrPull) and read secrets (KV Secrets User) only
+- **Automated scanning:** CI/CD pipeline blocks deployment on high/critical vulnerabilities (Week 3)
+- **Secrets management:** Database credentials stored in Azure Key Vault, never in code
 
-### 6. Test Everything Works! 🎉
+---
 
-1. **Visit the API docs**: http://localhost:8000/docs
-1. **Create your first entry** In the Docs UI Use the POST `/entries` endpoint to create a new journal entry.
-1. **View your entries** using the GET `/entries` endpoint to see what you've created!
-
-**🎯 Congratulations! You have a fully functional learning journal API with complete CRUD operations, validation, and logging!**
-
-## ⚙️ API Endpoints
-
-This learning journal API provides complete CRUD functionality:
-
-- **POST /entries** - Create a new journal entry with validation
-- **GET /entries** - Retrieve all journal entries with count
-- **GET /entries/{entry_id}** - Retrieve a single journal entry by ID
-- **PATCH /entries/{entry_id}** - Update an existing journal entry
-- **DELETE /entries/{entry_id}** - Delete a specific journal entry
-- **DELETE /entries** - Delete all journal entries
-
-All endpoints include proper error handling, data validation using Pydantic models, and structured logging for debugging and monitoring.
-
-## ☁️ Azure CLI for Deployment
-
-The dev container includes the Azure CLI pre-installed, allowing you to deploy your API directly to Azure cloud services. Use the `az` command in your terminal to authenticate with Azure, create resources like App Services and PostgreSQL databases, and deploy your application—all from within your development environment.
-
-## 📊 Data Schema
-
-Each journal entry follows this structure:
-
-| Field       | Type      | Description                                | Validation                   |
-|-------------|-----------|--------------------------------------------|------------------------------|
-| id          | string    | Unique identifier (UUID)                   | Auto-generated               |
-| work        | string    | What did you work on today?                | Required, max 256 characters |
-| struggle    | string    | What's one thing you struggled with today? | Required, max 256 characters |
-| intention   | string    | What will you study/work on tomorrow?      | Required, max 256 characters |
-| created_at  | datetime  | When entry was created                     | Auto-generated UTC           |
-| updated_at  | datetime  | When entry was last updated                | Auto-updated UTC             |
-
-## 🗄️ Explore Your Database (Optional)
-
-Want to see your data directly in the database? You can connect to PostgreSQL using VS Code's PostgreSQL extension:
-
-### 1. Install PostgreSQL Extension
-
-1. **Install the PostgreSQL extension** in VS Code (search for "PostgreSQL" by Chris Kolkman)
-2. **Restart VS Code** after installation
-
-### 2. Connect to Your Database
-
-1. **Open the PostgreSQL extension** (click the PostgreSQL icon in the sidebar)
-2. **Click "Add Connection"** or the "+" button
-3. **Enter these connection details**:
-   - **Host name**: `postgres`
-   - **User name**: `postgres`
-   - **Password**: `postgres`
-   - **Port**: `5432`
-   - **Conection Type**: `Standard/No SSL`
-   - **Database**: `learning_journal`
-   - **Display name**: `Learning Journal DB` (or any name you prefer)
-
-### 3. Explore Your Data
-
-1. **Expand your connection** in the PostgreSQL panel
-2. **Left-click on "Learning Journal DB" to expand**
-3. **Right-click on "learning_journal"**
-4. **Select "New Query"**
-5. **Type this query** to see all your entries:
-
-   ```sql
-   SELECT * FROM entries;
-   ```
-
-6. **Run the query** to see all your journal data! (Ctrl/Cmd + Enter OR use the PostgreSQL command pallete: Run Query)
-
-You can now explore the database structure, see exactly how your data is stored, and run custom queries to understand PostgreSQL better.
-
-## 🔧 Troubleshooting
-
-**If the API won't start:**
-
-- Make sure the PostgreSQL container is running: `docker ps`
-- Check the container logs: `docker logs your-postgres-container-name`
-- Restart the database: `docker restart your-postgres-container-name`
-
-**If you can't connect to the database:**
-
-- Verify the `.env` file exists and has the correct DATABASE_URL
-- Make sure Docker Desktop is running
-- Try restarting the dev container: `Dev Containers: Rebuild Container`
-
-**If the dev container won't open:**
-
-- Ensure Docker Desktop is running
-- Install the "Dev Containers" extension in VS Code
-- Try: `Dev Containers: Rebuild and Reopen in Container`
+*Built as a hands-on DevOps learning project by [Moh](https://github.com/nrikmoh).*

@@ -13,30 +13,34 @@ provider "azurerm" {
   features {}
 }
 
+# ── Resource Group ──────────────────────────────────
 resource "azurerm_resource_group" "rg" {
-  name     = "rg-learningsteps-devops"
-  location = "westeurope"
+  name     = var.resource_group_name
+  location = var.location
+  tags     = var.tags
 }
 
+# ── Networking ──────────────────────────────────────
 resource "azurerm_virtual_network" "vnet" {
   name                = "learningsteps-vnet"
-  address_space       = ["10.0.0.0/16"]
+  address_space       = var.vnet_address_space
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
+  tags                = var.tags
 }
 
 resource "azurerm_subnet" "aks" {
   name                 = "aks-subnet"
   resource_group_name  = azurerm_resource_group.rg.name
   virtual_network_name = azurerm_virtual_network.vnet.name
-  address_prefixes     = ["10.0.1.0/24"]
+  address_prefixes     = var.aks_subnet_prefix
 }
 
 resource "azurerm_subnet" "db" {
   name                 = "db-subnet"
   resource_group_name  = azurerm_resource_group.rg.name
   virtual_network_name = azurerm_virtual_network.vnet.name
-  address_prefixes     = ["10.0.2.0/24"]
+  address_prefixes     = var.db_subnet_prefix
   delegation {
     name = "postgresql-delegation"
     service_delegation {
@@ -45,16 +49,91 @@ resource "azurerm_subnet" "db" {
   }
 }
 
+# ── Network Security Groups ─────────────────────────
+resource "azurerm_network_security_group" "aks_nsg" {
+  name                = "aks-nsg"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  tags                = var.tags
+
+  security_rule {
+    name                       = "AllowHTTP"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "80"
+    source_address_prefix      = "Internet"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "AllowHTTPS"
+    priority                   = 110
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "443"
+    source_address_prefix      = "Internet"
+    destination_address_prefix = "*"
+  }
+}
+
+resource "azurerm_subnet_network_security_group_association" "aks_nsg_link" {
+  subnet_id                 = azurerm_subnet.aks.id
+  network_security_group_id = azurerm_network_security_group.aks_nsg.id
+}
+
+resource "azurerm_network_security_group" "db_nsg" {
+  name                = "db-nsg"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  tags                = var.tags
+
+  security_rule {
+    name                       = "AllowPostgresFromAKS"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "5432"
+    source_address_prefix      = "10.0.1.0/24"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "DenyAllInbound"
+    priority                   = 4096
+    direction                  = "Inbound"
+    access                     = "Deny"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+}
+
+resource "azurerm_subnet_network_security_group_association" "db_nsg_link" {
+  subnet_id                 = azurerm_subnet.db.id
+  network_security_group_id = azurerm_network_security_group.db_nsg.id
+}
+
+# ── AKS Cluster ─────────────────────────────────────
 resource "azurerm_kubernetes_cluster" "aks" {
   name                = "learningsteps-aks"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   dns_prefix          = "learningsteps"
+  tags                = var.tags
 
   default_node_pool {
-    name       = "default"
-    node_count = 1
-    vm_size    = "Standard_D2s_v6"
+    name           = "default"
+    node_count     = var.aks_node_count
+    vm_size        = var.aks_node_vm_size
     vnet_subnet_id = azurerm_subnet.aks.id
   }
 
@@ -64,13 +143,14 @@ resource "azurerm_kubernetes_cluster" "aks" {
 
   network_profile {
     network_plugin = "azure"
-    service_cidr   = "172.16.0.0/16"
-    dns_service_ip = "172.16.0.10"
+    service_cidr   = var.service_cidr
+    dns_service_ip = var.dns_service_ip
   }
 }
 
+# ── ACR Integration ─────────────────────────────────
 data "azurerm_container_registry" "acr" {
-  name                = "nrikmohacr"
+  name                = var.acr_name
   resource_group_name = azurerm_resource_group.rg.name
 }
 
@@ -81,9 +161,11 @@ resource "azurerm_role_assignment" "aks_acr_pull" {
   skip_service_principal_aad_check = true
 }
 
+# ── Private DNS for PostgreSQL ──────────────────────
 resource "azurerm_private_dns_zone" "pg" {
   name                = "private.postgres.database.azure.com"
   resource_group_name = azurerm_resource_group.rg.name
+  tags                = var.tags
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "pg_link" {
@@ -91,41 +173,46 @@ resource "azurerm_private_dns_zone_virtual_network_link" "pg_link" {
   resource_group_name   = azurerm_resource_group.rg.name
   private_dns_zone_name = azurerm_private_dns_zone.pg.name
   virtual_network_id    = azurerm_virtual_network.vnet.id
+  tags                  = var.tags
 }
 
+# ── PostgreSQL ──────────────────────────────────────
 resource "random_password" "pg_password" {
   length  = 20
   special = true
 }
 
 resource "azurerm_postgresql_flexible_server" "pg" {
-  name                          = "learningsteps-db-mk"
+  name                          = var.pg_server_name
   resource_group_name           = azurerm_resource_group.rg.name
   location                      = azurerm_resource_group.rg.location
   version                       = "16"
   delegated_subnet_id           = azurerm_subnet.db.id
   private_dns_zone_id           = azurerm_private_dns_zone.pg.id
   public_network_access_enabled = false
-  administrator_login           = "pgadmin"
+  administrator_login           = var.pg_admin_login
   administrator_password        = random_password.pg_password.result
-  sku_name                      = "B_Standard_B1ms"
+  sku_name                      = var.pg_sku
   storage_mb                    = 32768
+  tags                          = var.tags
 
   lifecycle {
     ignore_changes = [zone, high_availability]
   }
 }
 
+# ── Key Vault ───────────────────────────────────────
 data "azurerm_client_config" "current" {}
 
 resource "azurerm_key_vault" "kv" {
-  name                        = "kv-learningsteps-mk"
-  location                    = azurerm_resource_group.rg.location
-  resource_group_name         = azurerm_resource_group.rg.name
-  tenant_id                   = data.azurerm_client_config.current.tenant_id
-  sku_name                    = "standard"
-  purge_protection_enabled    = false
-  rbac_authorization_enabled  = true
+  name                       = var.kv_name
+  location                   = azurerm_resource_group.rg.location
+  resource_group_name        = azurerm_resource_group.rg.name
+  tenant_id                  = data.azurerm_client_config.current.tenant_id
+  sku_name                   = "standard"
+  purge_protection_enabled   = false
+  rbac_authorization_enabled = true
+  tags                       = var.tags
 }
 
 resource "azurerm_role_assignment" "user_kv_admin" {
