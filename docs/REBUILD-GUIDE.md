@@ -163,3 +163,27 @@ kubectl get svc -n monitoring monitoring-grafana
 ## Design Decision: Why Not Full Automation?
 
 We intentionally chose **not** to have Terraform manage Kubernetes manifests or Helm deployments. This avoids a chicken-and-egg problem: Terraform needs the AKS cluster to exist before it can deploy to it, but a single `terraform apply` creates and deploys in one pass. Keeping infrastructure (Terraform) and application deployment (CI/CD + kubectl) separate is a widely adopted industry pattern.
+
+---
+
+## Additional Lessons (from 2nd rebuild test)
+
+### 10. Terraform-Enabled CSI Addon May Have Null Identity
+**Problem:** When Terraform enables the CSI addon during cluster creation, the managed identity can be null. The addon shows as enabled but no identity exists, so CSI mounts fail.
+
+**Fix:** Disable and re-enable the addon via Azure CLI. Wait for the managed resource group to reach Succeeded state between disable and re-enable.
+
+### 11. Kubelet Identity as CSI Fallback
+**Problem:** If the addon identity is broken or null, CSI cannot authenticate to Key Vault.
+
+**Fix:** Use the kubelet identity (learningsteps-aks-agentpool) instead. It is always present and attached to every node. Grant it Key Vault Secrets User on the Key Vault, then use its clientId in the SecretProviderClass.
+
+### 12. SecretProviderClass Must Be Re-Applied After Rebuild
+**Problem:** The SecretProviderClass is a Kubernetes resource, not a Terraform resource. It gets destroyed with the cluster and must be re-applied manually.
+
+**Fix:** kubectl apply -f k8s/secretproviderclass.yml after connecting to the new cluster.
+
+### 13. ACR Pull Secret Must Be Updated in Kubernetes
+**Problem:** After ACR is recreated, the admin password changes. The Kubernetes docker-registry secret still holds the old password, causing ImagePullBackOff.
+
+**Fix:** Recreate the acr-secret with the new ACR password using kubectl create secret docker-registry.
