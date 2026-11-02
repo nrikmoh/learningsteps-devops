@@ -263,4 +263,8 @@ resource "azurerm_key_vault_secret" "pg_connection_string" {
   depends_on      = [azurerm_role_assignment.user_kv_admin]
 }
 
-
+resource "azurerm_role_assignment" "github_actions" {
+  scope                = azurerm_resource_group.rg.id
+  role_definition_name = "Contributor"
+  principal_id         = "8b0081c2-7a0a-45b2-a33f-d8416f8303ad"
+}
