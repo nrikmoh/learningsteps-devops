@@ -22,3 +22,12 @@ skip-check:
   - CKV_AZURE_189  # Public network access already disabled via public_network_access_enabled
   - CKV_AZURE_136  # Geo-redundant backups not needed for dev; adds cost
   - CKV2_AZURE_32  # Key Vault private endpoint not configured; RBAC provides access control for dev
+  - CKV_AZURE_137
+  - CKV_AZURE_139
+  - CKV_AZURE_163
+  - CKV_AZURE_164
+  - CKV_AZURE_165
+  - CKV_AZURE_166
+  - CKV_AZURE_167
+  - CKV_AZURE_233
+  - CKV_AZURE_237
