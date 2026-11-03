@@ -187,3 +187,25 @@ We intentionally chose **not** to have Terraform manage Kubernetes manifests or 
 **Problem:** After ACR is recreated, the admin password changes. The Kubernetes docker-registry secret still holds the old password, causing ImagePullBackOff.
 
 **Fix:** Recreate the acr-secret with the new ACR password using kubectl create secret docker-registry.
+
+---
+
+## Improvements Made After 2nd Rebuild
+
+### Remote State Backend
+Terraform state is now stored in Azure Blob Storage (`rg-terraform-state` / `stlearningstepsstate` / `tfstate`). This prevents "no objects to destroy" errors and makes rebuilds reliable.
+
+### SP Role Assignment in Terraform
+The GitHub Actions Service Principal role is now managed by Terraform (`azurerm_role_assignment.github_actions`). No manual re-granting needed after rebuild.
+
+### CSI Addon Config in Terraform
+Added `key_vault_secrets_provider` block to the AKS resource in `main.tf`. This ensures the CSI identity is always created properly — no more null identity bug.
+
+### Remaining Manual Steps After Rebuild
+Only 4 steps remain after `terraform apply`:
+1. `az aks get-credentials`
+2. Grant CSI identity Key Vault access
+3. Update `userAssignedIdentityID` in `secretproviderclass.yml`
+4. `helm install` monitoring
+
+5. 
