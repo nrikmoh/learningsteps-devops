@@ -120,7 +120,7 @@ jobs:
 
       # -- Push to ACR --
       - name: Login to ACR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: nrikmohacr.azurecr.io
           username: ${{ secrets.ACR_USERNAME }}
