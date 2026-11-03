@@ -107,6 +107,7 @@ Additionally, pytest runs automated tests (when a tests/ directory exists). All 
 - .github/workflows/cicd.yml - Full CI/CD pipeline (build, 12-tool scan, deploy)
 - .github/dependabot.yml - Automated dependency update PRs
 - README.md - This file
+- docs/REBUILD-GUIDE.md - 13 lessons from destroy/rebuild reproducibility testing
 
 ---
 
@@ -153,6 +154,7 @@ The pipeline runs on every push to the reference branch with two jobs:
 | Private DNS | private.postgres.database.azure.com | Linked to VNet |
 | NSG (AKS) | aks-nsg | Allow 80, 443 inbound |
 | NSG (DB) | db-nsg | Allow 5432 from 10.0.1.0/24 only |
+| Storage Account	| stlearningstepsstate	| Terraform remote state backend (separate RG) |
 | Monitoring | Prometheus + Grafana (Helm) | Deployed via kube-prometheus-stack |
 
 All Terraform resources tagged: project=learningsteps, environment=dev, managed_by=terraform.
@@ -178,7 +180,20 @@ Prerequisites: Azure CLI, Terraform v1.5+, Docker Desktop, kubectl, Helm, Azure 
     terraform init
     terraform apply
     az aks get-credentials --name learningsteps-aks --resource-group rg-learningsteps-devops
+
+# Grant CSI identity Key Vault access
+    $objectId = az aks show --name learningsteps-aks --resource-group rg-learningsteps-devops --query "addonProfiles.azureKeyvaultSecretsProvider.identity.objectId" -o tsv
+    az role assignment create --assignee $objectId --role "Key Vault Secrets User" --scope $(az keyvault show --name kv-learningsteps-mk --query id -o tsv)
+
+ # Deploy app
     kubectl apply -f k8s/
+
+# Seed database secret (one-time CSI chicken-and-egg fix)
+    $cs = az keyvault secret show --name pg-connection-string --vault-name kv-learningsteps-mk --query value -o tsv
+    kubectl create secret generic learningsteps-secrets --from-literal="database-url=$cs" -n learningsteps
+
+# Install monitoring
+    kubectl create namespace monitoring
     helm install monitoring prometheus-community/kube-prometheus-stack --namespace monitoring --values k8s/prometheus-values-lean.yml
 
 ---
@@ -204,6 +219,8 @@ Auto-stop policy shuts down AKS at midnight UTC. Run az aks start each morning.
 
     cd infra-terraform
     terraform destroy
+# Note: Remote state in Azure Blob Storage ensures reliable destroy every time.
+# The state storage account (rg-terraform-state) is managed separately and survives destroy.
 
 ---
 
@@ -215,6 +232,7 @@ Auto-stop policy shuts down AKS at midnight UTC. Run az aks start each morning.
 | 2 | IaC: AKS, PostgreSQL, Key Vault, NSGs, Private DNS, RBAC | Done |
 | 3 | CI/CD + DevSecOps: GitHub Actions, 12-tool security scanning | Done |
 | 4 | K8s hardening, CSI Driver secret sync, Prometheus + Grafana monitoring, secret scanning, linting | Done |
+| 5	| Reproducibility: full destroy/rebuild test, remote Terraform state, rebuild guide (13 lessons)	| Done |
 
 ---
 
@@ -232,6 +250,8 @@ Auto-stop policy shuts down AKS at midnight UTC. Run az aks start each morning.
 10. Defense in depth: NSGs + NetworkPolicy + RBAC + private endpoints + secret management. No single layer is enough.
 11. CSI Driver eliminates manual secret injection. Key Vault becomes the single source of truth, auto-synced to pods every 2 minutes.
 12. Monitoring is not optional. If you cannot see your metrics, you cannot fix your problems. Prometheus + Grafana turns invisible infrastructure into visible dashboards.
+13. Remote Terraform state is essential. Without it, Terraform destroy fails silently when state files are lost, and rebuilds become unreliable.
+14. Infrastructure must be reproducible. If you cannot destroy and rebuild from code alone, your IaC is incomplete. Full destroy/rebuild testing is the ultimate proof.
 
 ---
 
