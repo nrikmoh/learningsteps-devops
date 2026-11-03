@@ -142,7 +142,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
   azure_policy_enabled      = true
   tags                      = var.tags
 
-key_vault_secrets_provider {
+  key_vault_secrets_provider {
     secret_rotation_enabled = false
   }
 
