@@ -19,7 +19,7 @@ JOB 1: build-and-scan
   [PASS] terraform fmt (formatting correct)
   [PASS] terraform validate (syntax valid)
   [PASS] tfsec IaC scan (soft fail, no blocking issues)
-  [PASS] Checkov IaC+K8s+Docker scan (0 errors, 22 documented skips)
+  [PASS] Checkov IaC+K8s+Docker scan (0 errors, 31 documented skips)
   [PASS] kube-score K8s manifest scan (no critical issues)
   [PASS] Push to ACR (nrikmohacr.azurecr.io/learningsteps-api:<sha>)
 
@@ -38,7 +38,7 @@ SECURITY SCAN SUMMARY:
   - 12 tools executed across code, deps, containers, IaC, K8s, git history
   - 0 blocking vulnerabilities
   - 0 leaked secrets
-  - 0 Checkov errors (22 documented risk acceptances in .checkov.yml)
+  - 0 Checkov errors (31 documented risk acceptances in .checkov.yml)
   - Trivy: 0 fixable HIGH/CRITICAL CVEs (ignore-unfixed for OS-level)
 
 MONITORING:
@@ -50,4 +50,12 @@ MONITORING:
 SECRET MANAGEMENT:
   - Azure Key Vault CSI Driver enabled
   - Secrets auto-synced from kv-learningsteps-mk every 2 minutes
-  - No manual kubectl create secret required
+  - One-time manual seed required after fresh rebuild (CSI chicken-and-egg)
+
+INFRASTRUCTURE:
+  - 21 Azure resources managed by Terraform (remote state in Azure Blob Storage)
+  - Full destroy/rebuild tested and proven (~35 minutes)
+  - SP role assignment auto-created by Terraform
+  - CSI addon identity auto-created by Terraform
+  - Rebuild guide with 13 lessons: docs/REBUILD-GUIDE.md
+
