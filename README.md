@@ -163,9 +163,9 @@ All Terraform resources tagged: project=learningsteps, environment=dev, managed_
 
 | Service | URL |
 |---------|-----|
-| API (Swagger) | http://20.4.140.251/docs |
-| API Metrics | http://20.4.140.251/metrics |
-| Grafana | http://20.4.154.214 |
+| API (Swagger) | http://74.178.220.185/docs |
+| API Metrics | http://74.178.220.185/metrics |
+| Grafana | http://20.103.72.76 |
 
 ---
 

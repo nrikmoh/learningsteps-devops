@@ -3,8 +3,8 @@
 **Author:** Moh (nrikmoh)
 **Date:** October 2026
 **Repository:** https://github.com/nrikmoh/learningsteps-devops
-**Live Application:** http://20.4.140.251/docs
-**Live Monitoring:** http://20.4.154.214
+**Live Application:** http://74.178.220.185/docs
+**Live Monitoring:** http://20.103.72.76
 
 ---
 
@@ -305,14 +305,14 @@ Job 2: deploy (2-3 minutes)
   |-- Replace image tag with commit SHA
   |
   v
-Live at http://20.4.140.251/docs
-Monitored at http://20.4.154.214
+Live at http://74.178.220.185/docs
+Monitored at http://20.103.72.76
 ```
 
 ### 6.5 Deliverables
 
-- Live application accessible at http://20.4.140.251/docs.
-- Live Grafana dashboards at http://20.4.154.214.
+- Live application accessible at http://74.178.220.185/docs.
+- Live Grafana dashboards at http://20.103.72.76.
 - 10 Kubernetes manifests with full security hardening.
 - Key Vault CSI Driver auto-syncing secrets to pods every 2 minutes.
 - Prometheus scraping application /metrics endpoint every 15 seconds.
@@ -469,5 +469,5 @@ The journey from a failed manual VM deployment to a hardened, automated, monitor
 
 *Report prepared by Moh (nrikmoh) as part of a hands-on DevSecOps learning project.*
 *Repository: https://github.com/nrikmoh/learningsteps-devops*
-*Live Application: http://20.4.140.251/docs*
-*Live Monitoring: http://20.4.154.214*
+*Live Application: http://74.178.220.185/docs*
+*Live Monitoring: http://20.103.72.76*

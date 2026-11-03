@@ -30,9 +30,9 @@ JOB 2: deploy
   [PASS] Image tag replaced with commit SHA
 
 LIVE ENDPOINTS:
-  API Swagger: http://20.4.140.251/docs
-  API Metrics: http://20.4.140.251/metrics
-  Grafana:     http://20.4.154.214
+  API Swagger: http://74.178.220.185/docs
+  API Metrics: http://74.178.220.185/metrics
+  Grafana:     http://20.103.72.76
 
 SECURITY SCAN SUMMARY:
   - 12 tools executed across code, deps, containers, IaC, K8s, git history
@@ -43,7 +43,7 @@ SECURITY SCAN SUMMARY:
 
 MONITORING:
   - Prometheus scraping /metrics every 15 seconds
-  - Grafana dashboards available at http://20.4.154.214
+  - Grafana dashboards available at http://20.103.72.76
   - Pre-built dashboards: Kubernetes Compute Resources (Cluster, Pod, Node)
   - 5 monitoring pods running (Prometheus, Grafana, operator, kube-state, node-exporter)
 
