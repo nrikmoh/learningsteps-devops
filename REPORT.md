@@ -1,4 +1,4 @@
-# DevSecOps Pipeline on Azure: A Four-Week Journey from Zero to Production
+# DevSecOps Pipeline on Azure: A Five-Week Journey from Zero to Production
 
 **Author:** Moh (nrikmoh)
 **Date:** October 2026
@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-This report documents the design, implementation, and hardening of a fully automated DevSecOps pipeline for the LearningSteps API on Microsoft Azure. Over four weeks, the project evolved from a manual VM-based deployment to a production-grade Kubernetes infrastructure with 12-tool security scanning, Key Vault CSI Driver secret synchronization, live Prometheus + Grafana monitoring dashboards, zero-downtime deployments, and Infrastructure as Code reproducibility. Every git push to the repository now triggers an automated pipeline that builds, scans, and deploys the application without human intervention.
+This report documents the design, implementation, and hardening of a fully automated DevSecOps pipeline for the LearningSteps API on Microsoft Azure. Over five weeks, the project evolved from a manual VM-based deployment to a production-grade Kubernetes infrastructure with 12-tool security scanning, Key Vault CSI Driver secret synchronization, live Prometheus + Grafana monitoring dashboards, zero-downtime deployments, and proven Infrastructure as Code reproducibility. Week 5 focused on full destroy/rebuild testing, remote Terraform state, and documenting 13 lessons learned in a comprehensive rebuild guide. Every git push to the repository now triggers an automated pipeline that builds, scans, and deploys the application without human intervention.
 
 The project demonstrates proficiency in containerization (Docker, ACR), Infrastructure as Code (Terraform), CI/CD (GitHub Actions), security scanning (Trivy, tfsec, Checkov, Bandit, Semgrep, Hadolint, pip-audit, Kube-score, TruffleHog, flake8), Kubernetes orchestration (AKS), secret management (Azure Key Vault + CSI Driver), monitoring (Prometheus + Grafana), and cloud networking (VNet, NSGs, Private DNS, NetworkPolicy).
 
@@ -329,7 +329,7 @@ Monitored at http://20.103.72.76
 
 | Category | Count |
 |----------|-------|
-| Azure resources (Terraform-managed) | 15+ |
+| Azure resources (Terraform-managed) | 21 |
 | Kubernetes manifests | 10 |
 | Security scanning tools | 12 |
 | GitHub Secrets | 3 (ACR_USERNAME, ACR_PASSWORD, AZURE_CREDENTIALS) |
@@ -345,13 +345,28 @@ Monitored at http://20.103.72.76
 
 ### 7.2 Reproducibility Test
 
-The entire infrastructure can be destroyed and recreated with two commands:
+The entire infrastructure was destroyed and recreated from scratch twice during Week 5 to prove full reproducibility. The final test destroyed all 21 Terraform-managed resources and rebuilt them with a single command:
 
     cd infra-terraform
-    terraform destroy
-    terraform apply
+    terraform destroy   # 21 resources destroyed
+    terraform apply     # 21 resources recreated
 
-This recreates all 15+ Azure resources identically. The application is then deployed automatically by the CI/CD pipeline on the next git push. The monitoring stack is reinstalled with a single Helm command.
+Post-apply steps (4 manual commands):
+1. `az aks get-credentials` to connect kubectl
+2. Grant CSI identity Key Vault access (1 Azure CLI command)
+3. Update `userAssignedIdentityID` in `secretproviderclass.yml`
+4. `helm install` monitoring stack
+
+The CI/CD pipeline automatically rebuilds the Docker image when triggered by an empty commit. Total rebuild time: ~35 minutes from destroy to fully working application with monitoring.
+
+Key reproducibility improvements made during Week 5:
+- **Remote Terraform state** in Azure Blob Storage (`rg-terraform-state` / `stlearningstepsstate`) prevents state file loss and ensures reliable destroy/apply cycles.
+- **SP role assignment in Terraform** (`azurerm_role_assignment.github_actions`) auto-recreates the GitHub Actions deployment role on rebuild.
+- **CSI addon config in Terraform** (`key_vault_secrets_provider` block in AKS resource) ensures the CSI managed identity is always created properly.
+- **ACR Checkov skips** added to `.checkov.yml` for 9 new findings when ACR became a Terraform-managed resource.
+- **flake8 `|| true`** added to CI/CD pipeline to prevent upstream code style warnings from blocking deployments.
+
+All 13 lessons from the destroy/rebuild tests are documented in `docs/REBUILD-GUIDE.md`.
 
 ### 7.3 Security Posture
 
@@ -422,6 +437,10 @@ This recreates all 15+ Azure resources identically. The application is then depl
 
 12. **Monitoring is not optional.** If you cannot see your metrics, you cannot fix your problems. Adding prometheus-fastapi-instrumentator to the FastAPI app and deploying the kube-prometheus-stack turned invisible infrastructure into visible dashboards in under an hour.
 
+13. **Remote Terraform state is essential.** Without it, `terraform destroy` fails silently when local state files are lost (e.g., after a `git init` in the wrong folder), and rebuilds become unreliable. Storing state in Azure Blob Storage ensures Terraform always knows what it built, regardless of what happens to your local machine.
+
+14. **Infrastructure must be proven reproducible.** Writing Terraform code is not enough. The ultimate test is `terraform destroy` followed by `terraform apply` on a clean state. Our first destroy/rebuild attempt revealed 9 issues (null CSI identity, lost SP roles, rotated ACR passwords, missing K8s manifests). The second attempt, after fixes, completed in 35 minutes with zero errors.
+
 ### Process Lessons
 
 13. **Start with the simplest possible deployment, then harden.** Week 1 was just "make it run." Security hardening came in Weeks 3-4. Trying to do everything at once leads to paralysis.
@@ -440,6 +459,7 @@ This recreates all 15+ Azure resources identically. The application is then depl
 
 | Priority | Improvement | Effort | Impact |
 |----------|------------|--------|--------|
+| High | Automated post-apply script (`rebuild.ps1`) | 1 day | Reduces 4 manual steps to 1 command |
 | High | Custom domain + HTTPS (TLS) | 1 week | Eliminates "Not Secure" browser warning |
 | Medium | ArgoCD (GitOps) | 1 week | Pull-based deployments, audit trail |
 | Medium | Multi-environment (dev/staging/prod) | 2-3 weeks | Separate environments with branch-based deploys |
@@ -459,7 +479,7 @@ This project demonstrates that a production-grade DevSecOps pipeline is achievab
 - **Automated secret management:** Azure Key Vault CSI Driver syncs secrets to pods every 2 minutes with no manual intervention.
 - **Live monitoring:** Prometheus collects metrics every 15 seconds; Grafana provides real-time dashboards for cluster health.
 - **Zero-downtime deployments:** Rolling updates ensure users never experience interruption.
-- **Complete reproducibility:** terraform destroy + terraform apply recreates the entire environment identically.
+- **Proven reproducibility:** Full destroy/rebuild tested twice. Remote Terraform state in Azure Blob Storage ensures reliable state management. 21 resources recreated from code in ~35 minutes with only 4 manual post-apply steps.
 - **Defense in depth:** Eight layers of security from network to application to secrets to git history.
 - **Cost awareness:** Under $100/month with auto-stop and budget-conscious resource selection.
 
